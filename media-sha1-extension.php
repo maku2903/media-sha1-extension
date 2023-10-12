@@ -2,7 +2,7 @@
 /*
 Plugin Name: Media SHA1 Extension
 Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated.
-Version: 1.0.0
+Version: 1.0.2
 Author: Maciej Pondo
 */
 
@@ -23,12 +23,20 @@ function get_media_sha1($object) {
     return get_post_meta($object['id'], 'sha1_hash', true);
 }
 
+// Add SHA1 as a recognized public query variable
+add_filter('query_vars', 'add_sha1_query_var');
+function add_sha1_query_var($vars) {
+    $vars[] = 'sha1';
+    return $vars;
+}
+
 // Allow querying media by SHA1 hash
 add_filter('posts_clauses', 'extend_media_query_by_sha1', 10, 2);
 function extend_media_query_by_sha1($clauses, $query) {
     global $wpdb;
 
-    if ($sha1 = $query->get('sha1')) {
+    $sha1 = $query->get('sha1');
+    if ($sha1) {
         $meta_query = [
             [
                 'key' => 'sha1_hash',
