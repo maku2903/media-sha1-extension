@@ -2,7 +2,7 @@
 /*
 Plugin Name: Media SHA1 Extension
 Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated.
-Version: 1.0.2
+Version: 1.0.3
 Author: Maciej Pondo
 */
 
@@ -31,28 +31,21 @@ function add_sha1_query_var($vars) {
 }
 
 // Allow querying media by SHA1 hash
-add_filter('posts_clauses', 'extend_media_query_by_sha1', 10, 2);
-function extend_media_query_by_sha1($clauses, $query) {
-    global $wpdb;
-
-    $sha1 = $query->get('sha1');
-    if ($sha1) {
-        $meta_query = [
-            [
-                'key' => 'sha1_hash',
-                'value' => $sha1,
-                'compare' => '='
-            ]
-        ];
-
-        $meta_query_obj = new WP_Meta_Query($meta_query);
-        $meta_sql = $meta_query_obj->get_sql('post', $wpdb->posts, 'ID', $query);
-
-        $clauses['join'] .= $meta_sql['join'];
-        $clauses['where'] .= $meta_sql['where'];
+add_action('pre_get_posts', 'extend_media_query_by_sha1');
+function extend_media_query_by_sha1($query) {
+    if (!is_admin() && $query->is_main_query() && $query->get('post_type') === 'attachment') {
+        $sha1 = $query->get('sha1');
+        if ($sha1) {
+            $meta_query = [
+                [
+                    'key' => 'sha1_hash',
+                    'value' => $sha1,
+                    'compare' => '='
+                ]
+            ];
+            $query->set('meta_query', $meta_query);
+        }
     }
-
-    return $clauses;
 }
 
 // On activation, calculate and save SHA1 hashes for existing media files
