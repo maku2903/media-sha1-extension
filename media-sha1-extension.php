@@ -30,23 +30,34 @@ function add_sha1_query_var($vars) {
     return $vars;
 }
 
-// Allow querying media by SHA1 hash
+// Allow querying media by SHA1 hash using posts_clauses
 add_action('pre_get_posts', 'extend_media_query_by_sha1');
 function extend_media_query_by_sha1($query) {
-    if (!is_admin() && $query->is_main_query() && $query->get('post_type') === 'attachment') {
-        $sha1 = $query->get('sha1');
-        if ($sha1) {
-            $meta_query = [
-                [
-                    'key' => 'sha1_hash',
-                    'value' => $sha1,
-                    'compare' => '='
-                ]
-            ];
-            $query->set('meta_query', $meta_query);
+    // Check if it's a REST API request
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        
+        // Get the current route
+        $current_route = $GLOBALS['wp']->query_vars['rest_route'];
+        
+        // Check if it's a request to the media endpoint
+        if (strpos($current_route, '/wp/v2/media') !== false) {
+            
+            $sha1 = $query->get('sha1');
+            if ($sha1) {
+                $meta_query = [
+                    [
+                        'key' => 'sha1_hash',
+                        'value' => $sha1,
+                        'compare' => '='
+                    ]
+                ];
+                $query->set('meta_query', $meta_query);
+            }
         }
     }
 }
+
+
 
 // On activation, calculate and save SHA1 hashes for existing media files
 register_activation_hook(__FILE__, 'save_sha1_for_all_existing_media');
