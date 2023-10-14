@@ -2,7 +2,7 @@
 /*
 Plugin Name: Media SHA1 Extension
 Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated.
-Version: 1.0.3
+Version: 1.0.4
 Author: Maciej Pondo
 */
 
@@ -57,8 +57,6 @@ function extend_media_query_by_sha1($query) {
     }
 }
 
-
-
 // On activation, calculate and save SHA1 hashes for existing media files
 register_activation_hook(__FILE__, 'save_sha1_for_all_existing_media');
 function save_sha1_for_all_existing_media() {
@@ -84,5 +82,12 @@ function save_sha1_for_media($post_id) {
 }
 
 // On each media upload, calculate and save SHA1 hash
-add_action('add_attachment', 'save_sha1_for_media');
+add_filter('wp_generate_attachment_metadata', 'save_sha1_for_media_after_upload', 10, 2);
+function save_sha1_for_media_after_upload($metadata, $attachment_id) {
+    save_sha1_for_media($attachment_id);
+    return $metadata;
+}
+
 add_action('update_attached_file', 'save_sha1_for_media');
+
+?>
