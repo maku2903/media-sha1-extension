@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: Media SHA1 Extension
-Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated.
-Version: 1.0.4
+Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated. Additionally, displays the SHA1 in the media edit page in the admin area.
+Version: 1.0.5
 Author: Maciej Pondo
 */
 
@@ -55,13 +55,10 @@ add_action('pre_get_posts', 'extend_media_query_by_sha1');
 function extend_media_query_by_sha1($query) {
     // Check if it's a REST API request
     if (defined('REST_REQUEST') && REST_REQUEST) {
-        
         // Get the current route
         $current_route = $GLOBALS['wp']->query_vars['rest_route'];
-        
         // Check if it's a request to the media endpoint
         if (strpos($current_route, '/wp/v2/media') !== false) {
-            
             $sha1 = $query->get('sha1');
             if ($sha1) {
                 $meta_query = [
@@ -77,9 +74,9 @@ function extend_media_query_by_sha1($query) {
     }
 }
 
-// On activation, calculate and save SHA1 hashes for existing media files
-register_activation_hook(__FILE__, 'save_sha1_for_all_existing_media');
-function save_sha1_for_all_existing_media() {
+// On activation, recalculate and save SHA1 hashes for existing media files
+register_activation_hook(__FILE__, 'recalculate_sha1_for_all_existing_media');
+function recalculate_sha1_for_all_existing_media() {
     $args = [
         'post_type' => 'attachment',
         'posts_per_page' => -1,
@@ -88,16 +85,19 @@ function save_sha1_for_all_existing_media() {
 
     $attachments = get_posts($args);
     foreach ($attachments as $attachment) {
-        save_sha1_for_media($attachment->ID);
+        save_sha1_for_media($attachment->ID, true);
     }
 }
 
 // Utility function to calculate and save SHA1 hash for a specific media item
-function save_sha1_for_media($post_id) {
-    $file_path = get_attached_file($post_id);
-    if ($file_path && file_exists($file_path)) {
-        $hash = sha1_file($file_path);
-        update_post_meta($post_id, 'sha1_hash', $hash);
+function save_sha1_for_media($post_id, $force = false) {
+    $existing_sha1 = get_post_meta($post_id, 'sha1_hash', true);
+    if (!$existing_sha1 || $force) {
+        $file_path = get_attached_file($post_id);
+        if ($file_path && file_exists($file_path)) {
+            $hash = sha1_file($file_path);
+            update_post_meta($post_id, 'sha1_hash', $hash);
+        }
     }
 }
 
