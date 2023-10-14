@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Media SHA1 Extension
-Description: Adds a sha1 field to the media API endpoint and ensures all current files have generated SHA1 when the plugin is activated. Additionally, displays the SHA1 in the media edit page in the admin area.
+Description: Adds a SHA1 field to the media API endpoint and allows recalculation from the media edit page.
 Version: 1.0.5
 Author: Maciej Pondo
 */
@@ -19,11 +19,13 @@ function add_sha1_meta_box() {
 }
 add_action('add_meta_boxes', 'add_sha1_meta_box');
 
-// Populate the SHA1 meta box with the value
+// Populate the SHA1 meta box with the value and recalculate button
 function display_sha1_meta_box($post) {
     $sha1 = get_post_meta($post->ID, 'sha1_hash', true);
     echo '<p><strong>SHA1:</strong></p>';
-    echo '<p>' . esc_html($sha1) . '</p>';
+    echo '<p id="sha1_value">' . esc_html($sha1) . '</p>';
+    echo '<button type="button" id="recalculate_sha1" data-postid="' . $post->ID . '">Recalculate SHA1</button>';
+    echo '<span id="recalculate_status"></span>';
 }
 
 // Register SHA1 field for media endpoint
@@ -74,30 +76,12 @@ function extend_media_query_by_sha1($query) {
     }
 }
 
-// On activation, recalculate and save SHA1 hashes for existing media files
-register_activation_hook(__FILE__, 'recalculate_sha1_for_all_existing_media');
-function recalculate_sha1_for_all_existing_media() {
-    $args = [
-        'post_type' => 'attachment',
-        'posts_per_page' => -1,
-        'post_status' => 'any',
-    ];
-
-    $attachments = get_posts($args);
-    foreach ($attachments as $attachment) {
-        save_sha1_for_media($attachment->ID, true);
-    }
-}
-
 // Utility function to calculate and save SHA1 hash for a specific media item
-function save_sha1_for_media($post_id, $force = false) {
-    $existing_sha1 = get_post_meta($post_id, 'sha1_hash', true);
-    if (!$existing_sha1 || $force) {
-        $file_path = get_attached_file($post_id);
-        if ($file_path && file_exists($file_path)) {
-            $hash = sha1_file($file_path);
-            update_post_meta($post_id, 'sha1_hash', $hash);
-        }
+function save_sha1_for_media($post_id) {
+    $file_path = get_attached_file($post_id);
+    if ($file_path && file_exists($file_path)) {
+        $hash = sha1_file($file_path);
+        update_post_meta($post_id, 'sha1_hash', $hash);
     }
 }
 
@@ -108,6 +92,47 @@ function save_sha1_for_media_after_upload($metadata, $attachment_id) {
     return $metadata;
 }
 
-add_action('update_attached_file', 'save_sha1_for_media');
+// JavaScript to handle the SHA1 recalculation from media edit page
+add_action('admin_footer', 'add_admin_footer_script');
+function add_admin_footer_script() {
+    ?>
+    <script>
+        jQuery(document).ready(function($) {
+            $('#recalculate_sha1').on('click', function() {
+                var postID = $(this).data('postid');
+                $('#recalculate_status').text('Recalculating...');
+                $.ajax({
+                    url: ajaxurl,
+                    method: 'POST',
+                    data: {
+                        action: 'recalculate_sha1',
+                        post_id: postID
+                    },
+                    success: function(response) {
+                        $('#sha1_value').text(response.data);
+                        $('#recalculate_status').text('Recalculated successfully!');
+                    },
+                    error: function() {
+                        $('#recalculate_status').text('Error recalculating SHA1.');
+                    }
+                });
+            });
+        });
+    </script>
+    <?php
+}
+
+// Handle the AJAX request to recalculate SHA1
+add_action('wp_ajax_recalculate_sha1', 'handle_recalculate_sha1_ajax');
+function handle_recalculate_sha1_ajax() {
+    if (isset($_POST['post_id'])) {
+        $post_id = intval($_POST['post_id']);
+        save_sha1_for_media($post_id);
+        $sha1 = get_post_meta($post_id, 'sha1_hash', true);
+        wp_send_json_success($sha1);
+    } else {
+        wp_send_json_error();
+    }
+}
 
 ?>
