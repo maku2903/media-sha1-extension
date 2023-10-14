@@ -6,6 +6,26 @@ Version: 1.0.4
 Author: Maciej Pondo
 */
 
+// Add the SHA1 meta box to the media edit page
+function add_sha1_meta_box() {
+    add_meta_box(
+        'sha1_meta_box', 
+        'SHA1 Hash', 
+        'display_sha1_meta_box', 
+        'attachment', 
+        'side', 
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'add_sha1_meta_box');
+
+// Populate the SHA1 meta box with the value
+function display_sha1_meta_box($post) {
+    $sha1 = get_post_meta($post->ID, 'sha1_hash', true);
+    echo '<p><strong>SHA1:</strong></p>';
+    echo '<p>' . esc_html($sha1) . '</p>';
+}
+
 // Register SHA1 field for media endpoint
 add_action('rest_api_init', 'register_sha1_for_media');
 function register_sha1_for_media() {
